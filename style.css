@@ -1,35 +1,58 @@
 body {
-  font-family: sans-serif;
-  background: #f4f4f4;
-  margin: 0;
-  padding: 2em;
+  font-family: 'Segoe UI', sans-serif;
+  margin: 2rem;
+  background-color: #f7f7f7;
+  color: #222;
+  line-height: 1.6;
+}
+
+input[type="file"] {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+input[type="file"]:hover {
+  background-color: #f0f0f0;
+}
+
+#metadata {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#metadata h2 {
+  margin-top: 0;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 0.5rem;
+}
+
+#metadata h3 {
+  margin-top: 1.5rem;
+  color: #444;
+  border-left: 4px solid #0077cc;
+  padding-left: 0.5rem;
+}
+
+#metadata pre {
+  background-color: #f3f3f3;
+  padding: 1rem;
+  overflow-x: auto;
+  border-radius: 6px;
+  font-size: 0.9rem;
   color: #333;
 }
 
-.container {
-  max-width: 700px;
-  margin: auto;
-  background: white;
-  padding: 2em;
-  border-radius: 10px;
-  box-shadow: 0 0 10px #ccc;
-}
-
-h1 {
-  text-align: center;
-}
-
-#output section {
-  margin-top: 1.5em;
-  border-top: 1px solid #ddd;
-  padding-top: 1em;
-}
-
-ul {
-  list-style: none;
-  padding: 0;
-}
-
-li {
-  padding: 0.25em 0;
+#metadata img {
+  margin-top: 1rem;
+  max-width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
