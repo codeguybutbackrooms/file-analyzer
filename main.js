@@ -1,137 +1,99 @@
-const fileInput = document.getElementById("fileInput");
-const output = document.getElementById("output");
+document.getElementById("fileInput").addEventListener("change", handleFile);
 
-fileInput.addEventListener("change", async (e) => {
-  const file = e.target.files[0];
+function handleFile(event) {
+  const file = event.target.files[0];
   if (!file) return;
-  output.innerHTML = "";
 
-  // Thông tin chung
-  const general = document.createElement("section");
-  general.innerHTML = `<h2>📁 General Info</h2>
-    <ul>
-      <li><strong>Name:</strong> ${file.name}</li>
-      <li><strong>Size:</strong> ${file.size} bytes</li>
-      <li><strong>Type (MIME):</strong> ${file.type || "Unknown"}</li>
-    </ul>`;
-  output.appendChild(general);
+  const metadataDiv = document.getElementById("metadata");
+  metadataDiv.innerHTML = `<h2>File Info</h2>
+    <p><strong>Name:</strong> ${file.name}</p>
+    <p><strong>Type:</strong> ${file.type}</p>
+    <p><strong>Size:</strong> ${file.size} bytes</p>
+    <p><strong>Last Modified:</strong> ${new Date(file.lastModified).toLocaleString()}</p>`;
 
-  // SHA-256
-  const buffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-  general.querySelector("ul").innerHTML += `<li><strong>SHA-256:</strong> ${hashHex}</li>`;
+  const type = file.type;
 
-  // Ảnh
-  if (file.type.startsWith("image/")) {
-    const section = document.createElement("section");
-    section.innerHTML = `<h2>📷 Image Metadata</h2><ul><li>Loading...</li></ul>`;
-    output.appendChild(section);
+  if (type.startsWith("image/")) {
+    handleImage(file);
+  } else if (type === "application/pdf") {
+    handlePDF(file);
+  } else if (type.startsWith("audio/") || type === "audio/mpeg") {
+    handleAudio(file);
+  } else {
+    const unknownDiv = document.createElement("div");
+    unknownDiv.innerHTML = `<h3>Unsupported or unknown file type</h3>`;
+    metadataDiv.appendChild(unknownDiv);
+  }
+}
+
+function handleImage(file) {
+  const metadataDiv = document.getElementById("metadata");
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const img = document.createElement("img");
+    img.src = e.target.result;
+    img.style.maxWidth = "300px";
+    metadataDiv.appendChild(img);
 
     EXIF.getData(file, function () {
-      const exif = EXIF.getAllTags(this);
-      const list = section.querySelector("ul");
-      list.innerHTML = "";
-
-      for (const tag in exif) {
-        list.innerHTML += `<li><strong>${tag}:</strong> ${exif[tag]}</li>`;
-      }
-
-      if (Object.keys(exif).length === 0) {
-        list.innerHTML = "<li>No EXIF data found.</li>";
-      }
+      const allMetaData = EXIF.getAllTags(this);
+      const exifDiv = document.createElement("div");
+      exifDiv.innerHTML = "<h3>EXIF Data</h3><pre>" + JSON.stringify(allMetaData, null, 2) + "</pre>";
+      metadataDiv.appendChild(exifDiv);
     });
-  }
+  };
+  reader.readAsDataURL(file);
+}
 
-  // MP3
-  else if (file.type === "audio/mpeg") {
-    const section = document.createElement("section");
-    section.innerHTML = `<h2>🎵 MP3 Metadata</h2><ul><li>Loading...</li></ul>`;
-    output.appendChild(section);
+function handleAudio(file) {
+  const metadataDiv = document.getElementById("metadata");
 
-    window.jsmediatags.read(file, {
-      onSuccess: function(tag) {
-        const tags = tag.tags;
-        const list = section.querySelector("ul");
-        list.innerHTML = "";
+  jsmediatags.read(file, {
+    onSuccess: function (tag) {
+      const tags = tag.tags;
+      const audioInfo = document.createElement("div");
+      audioInfo.innerHTML = `<h3>Audio Metadata</h3>
+        <p><strong>Title:</strong> ${tags.title || "N/A"}</p>
+        <p><strong>Artist:</strong> ${tags.artist || "N/A"}</p>
+        <p><strong>Album:</strong> ${tags.album || "N/A"}</p>
+        <p><strong>Year:</strong> ${tags.year || "N/A"}</p>`;
 
-        for (const key in tags) {
-          if (key === "picture") continue;
-          list.innerHTML += `<li><strong>${key}:</strong> ${tags[key]}</li>`;
-        }
-
-        if (tags.picture) {
-          const base64 = arrayBufferToBase64(tags.picture.data);
-          const img = document.createElement("img");
-          img.src = `data:${tags.picture.format};base64,${base64}`;
-          img.style.maxWidth = "100px";
-          list.innerHTML += `<li><strong>Cover:</strong><br/>`;
-          list.lastChild.appendChild(img);
-        }
-      },
-      onError: function(err) {
-        section.querySelector("ul").innerHTML = `<li>Error reading ID3: ${err.info}</li>`;
+      if (tags.picture) {
+        const base64String = tags.picture.data.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
+        const imageUrl = `data:${tags.picture.format};base64,${btoa(base64String)}`;
+        const img = document.createElement("img");
+        img.src = imageUrl;
+        img.style.maxWidth = "200px";
+        audioInfo.appendChild(img);
       }
-    });
-  }
 
-  // Video
-  else if (file.type.startsWith("video/")) {
-    const section = document.createElement("section");
-    section.innerHTML = `<h2>🎥 Video Info</h2><ul><li>Loading...</li></ul>`;
-    output.appendChild(section);
+      metadataDiv.appendChild(audioInfo);
+    },
+    onError: function (error) {
+      console.error("jsmediatags error", error);
+      metadataDiv.innerHTML += "<p>Could not read audio metadata.</p>";
+    }
+  });
+}
 
-    const video = document.createElement("video");
-    video.preload = "metadata";
-    video.src = URL.createObjectURL(file);
+function handlePDF(file) {
+  const metadataDiv = document.getElementById("metadata");
+  const reader = new FileReader();
 
-    video.onloadedmetadata = function () {
-      const duration = video.duration.toFixed(2);
-      const width = video.videoWidth;
-      const height = video.videoHeight;
-      section.querySelector("ul").innerHTML = `
-        <li><strong>Duration:</strong> ${duration}s</li>
-        <li><strong>Resolution:</strong> ${width} x ${height}</li>
-      `;
-      URL.revokeObjectURL(video.src);
-    };
-  }
+  reader.onload = function () {
+    const typedarray = new Uint8Array(reader.result);
 
-  // PDF
-  else if (file.type === "application/pdf") {
-    const section = document.createElement("section");
-    section.innerHTML = `<h2>📄 PDF Info</h2><ul><li>Loading...</li></ul>`;
-    output.appendChild(section);
+    pdfjsLib.getDocument(typedarray).promise.then(function (pdf) {
+      const pdfDiv = document.createElement("div");
+      pdfDiv.innerHTML = `<h3>PDF Metadata</h3>
+        <p><strong>Pages:</strong> ${pdf.numPages}</p>`;
 
-    const reader = new FileReader();
-    reader.onload = function() {
-      const typedarray = new Uint8Array(this.result);
-      pdfjsLib.getDocument({ data: typedarray }).promise.then(function(pdf) {
-        section.querySelector("ul").innerHTML = `
-          <li><strong>Pages:</strong> ${pdf.numPages}</li>
-        `;
-        return pdf.getMetadata();
-      }).then((meta) => {
-        if (meta.info.Title) {
-          section.querySelector("ul").innerHTML += `
-            <li><strong>Title:</strong> ${meta.info.Title}</li>
-          `;
-        }
-      }).catch(err => {
-        section.querySelector("ul").innerHTML = `<li>Error reading PDF: ${err.message}</li>`;
+      pdf.getMetadata().then(function (data) {
+        pdfDiv.innerHTML += `<pre>${JSON.stringify(data.info, null, 2)}</pre>`;
+        metadataDiv.appendChild(pdfDiv);
       });
-    };
-    reader.readAsArrayBuffer(file);
-  }
-});
+    });
+  };
 
-// Helper: convert binary to Base64
-function arrayBufferToBase64(buffer) {
-  let binary = '';
-  let bytes = new Uint8Array(buffer);
-  for (let b of bytes) {
-    binary += String.fromCharCode(b);
-  }
-  return window.btoa(binary);
+  reader.readAsArrayBuffer(file);
 }
