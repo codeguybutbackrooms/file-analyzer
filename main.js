@@ -1,6 +1,6 @@
 document.getElementById("fileInput").addEventListener("change", handleFile);
 
-function handleFile(event) {
+async function handleFile(event) {
   const file = event.target.files[0];
   if (!file) return;
 
@@ -19,6 +19,8 @@ function handleFile(event) {
     handlePDF(file);
   } else if (type.startsWith("audio/") || type === "audio/mpeg") {
     handleAudio(file);
+  } else if (type.startsWith("video/")) {
+    await handleVideo(file);
   } else {
     const unknownDiv = document.createElement("div");
     unknownDiv.innerHTML = `<h3>Unsupported or unknown file type</h3>`;
@@ -96,4 +98,38 @@ function handlePDF(file) {
   };
 
   reader.readAsArrayBuffer(file);
+}
+
+async function handleVideo(file) {
+  const metadataDiv = document.getElementById("metadata");
+
+
+  const loadingEl = document.createElement("p");
+  loadingEl.textContent = "Reading video metadata...";
+  metadataDiv.appendChild(loadingEl);
+  
+  await new Promise(r => setTimeout(r, 0));
+
+  const mediaInfo = await MediaInfo({ format: 'object' });
+
+  const readChunk = (chunkSize, offset) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(new Uint8Array(reader.result));
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file.slice(offset, offset + chunkSize));
+    });
+
+  const chunkSize = file.size;
+
+  const result = await mediaInfo.analyzeData(
+    () => file.size,
+    (size, offset) => readChunk(chunkSize, offset)
+  );
+
+  loadingEl.remove();
+
+  const videoDiv = document.createElement("div");
+  videoDiv.innerHTML = `<h3>Video Metadata</h3><pre>${JSON.stringify(result, null, 2)}</pre>`;
+  metadataDiv.appendChild(videoDiv);
 }
